@@ -1,0 +1,25 @@
+#: import XCamera kivy.garden.xcamera.XCamera
+
+<changeCameraButton@Button>:
+    size_hint: .17, .19
+    pos_hint: {"x": .855, "center_y": .38}
+    background_normal: "change_camera.png"
+
+<predictPrayButton@Button>:
+    size_hint: .2, .2
+    pos_hint: {"x": .845, "center_y": .65}
+    background_normal: "pray_icon.png"
+
+
+FloatLayout:
+    orientation: "vertical"
+    XCamera:
+        id: xcamera
+        index: 0
+        play: True
+
+    changeCameraButton:
+        on_press: root.change_camera()
+
+    predictPrayButton:
+        on_press: root.predict()

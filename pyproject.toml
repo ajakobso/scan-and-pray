@@ -1,0 +1,70 @@
+[tool.briefcase]
+project_name = "Scan&Pray"
+bundle = "com.thdespou.scanandpray"
+version = "0.0.1"
+url = "https://scanandpray.thdespou.com/scanandpray"
+license = "BSD license"
+author = 'ayelet orly and noga'
+author_email = "ayeletsohn@gmail.com"
+
+[tool.briefcase.app.scanandpray]
+formal_name = "Scan&Pray"
+description = "scan your plate and recieve the matching prayers in the right order"
+icon = "src/scanandpray/resources/scanandpray"
+sources = ['src/scanandpray']
+requires = [
+]
+
+
+[tool.briefcase.app.scanandpray.macOS]
+requires = [
+    'toga-cocoa>=0.3.0.dev38',
+    'std-nslog~=1.0.0'
+]
+
+[tool.briefcase.app.scanandpray.linux]
+requires = [
+    'toga-gtk>=0.3.0.dev38',
+]
+
+[tool.briefcase.app.scanandpray.linux.appimage]
+system_requires = [
+    'gir1.2-webkit-3.0',
+    'libcairo2-dev',
+    'libgirepository1.0-dev',
+    'libgtk-3-dev',
+    'libpango1.0-dev',
+    'librsvg2-dev',
+    'libwebkitgtk-3.0-0',
+]
+linuxdeploy_plugins = [
+    'DEPLOY_GTK_VERSION=3 gtk',
+]
+
+[tool.briefcase.app.scanandpray.linux.flatpak]
+flatpak_runtime = 'org.gnome.Platform'
+flatpak_runtime_version = '42'
+flatpak_sdk = 'org.gnome.Sdk'
+
+[tool.briefcase.app.scanandpray.windows]
+requires = [
+    'toga-winforms>=0.3.0.dev38',
+]
+
+# Mobile deployments
+[tool.briefcase.app.scanandpray.iOS]
+requires = [
+    'toga-iOS>=0.3.0.dev38',
+    'std-nslog~=1.0.0'
+]
+
+[tool.briefcase.app.scanandpray.android]
+requires = [
+    'toga-android>=0.3.0.dev38'
+]
+
+[tool.briefcase.app.scanandpray.web]
+requires = [
+    'toga-web>=0.3.0.dev38'
+]
+style_framework = "Bootstrap v4.6"
