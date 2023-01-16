@@ -1,9 +1,12 @@
-from kivy.properties import StringProperty
+from kivy.graphics import Rectangle
 from kivy.uix.button import Button
 from kivy.garden.xcamera import XCamera
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.label import Label
 from roboflow import Roboflow
-from kivy.base import runTouchApp
+from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
+from kivy.app import App
+
 import os
 
 MIN_CONFIDENCE = 0.5
@@ -58,7 +61,7 @@ def pray(predictions):
     return pray_text
 
 
-class MainScreen(FloatLayout):
+class MainScreen(Screen):
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
         self.orientation = "vertical"
@@ -103,7 +106,7 @@ class MainScreen(FloatLayout):
         # TODO
         # if there is no file available - print an error, and ask to take a picture first
         first_image = sorted_date_files[0]
-        # first_image = "food.jpg"
+
         # infer on a local image
         output = self.model.predict(first_image).json()
 
@@ -121,19 +124,12 @@ class MainScreen(FloatLayout):
 
         pray_text = pray(new_dict.keys())
 
-        self.screen_manager.get_screen('pray_screen').pray_text = pray_text
-        self.screen_manager.current = 'pray_screen'
-
-        # create an instance of the PrayScreen
-        pray_screen = PrayScreen(name='pray_screen')
-
-        # create an instance of the ScreenManager
-        screen_manager = ScreenManager()
-
-        # add the PrayScreen and MainScreen to the ScreenManager
-        screen_manager.add_widget(pray_screen)
-        screen_manager.add_widget(MainScreen(screen_manager=screen_manager))
         print(pray_text)
+
+        # switch to the pray screen
+        pray_screen = self.screen_manager.get_screen('pray_screen')
+        pray_screen.ids.pray_text.text = pray_text
+        self.screen_manager.switch_to(pray_screen)
 
         # TODO
         # 1. create a dictionary with the name of the pray as the key and the text as the value check
@@ -142,5 +138,46 @@ class MainScreen(FloatLayout):
         # 3. create a GUI to display it (maybe use the background of the first presentation) and write above the text
         # 4. create a button to go back to the camera screen
 
+
+class BackToCameraButton(Button):
+    def __init__(self, **kwargs):
+        super(BackToCameraButton, self).__init__(**kwargs)
+        self.size_hint = (0.2, 0.2)
+        self.pos_hint = {'center_x': 0.5, 'center_y': 0.9}
+        self.background_normal = 'return_icon.png'
+
+
+class PrayScreen(Screen):
+    def __init__(self, **kwargs):
+        super(PrayScreen, self).__init__(**kwargs)
+        self.orientation = "vertical"
+
+        # add a label for the pray text
+        self.pray = Label(text="", pos_hint={'x': 0.5, 'y': 0.5}, size_hint=(0.8, 0.8), id='pray_text')
+        self.add_widget(self.pray)
+
+        # add background image to the screen
+        self.rect = Rectangle(pos=self.pos, size=self.size, source='pray_background.png')
+        self.before.add_widget(self.rect)
+
+        # add a return to camera button
+        self.back_to_camera_button = BackToCameraButton()
+        self.back_to_camera_button.bind(on_press=self.back_to_camera)
+        self.add_widget(self.back_to_camera_button)
+
+    def back_to_camera(self, instance):
+        self.screen_manager.switch_to(self.screen_manager.get_screen('main_screen'))
+
+
+class TestApp(App):
+    def build(self):
+        screen_manager = ScreenManager(transition=FadeTransition())
+        screen_manager.add_widget(MainScreen(name='main_screen'))
+        screen_manager.add_widget(PrayScreen(name='pray_screen'))
+        MainScreen.screen_manager = screen_manager
+        PrayScreen.screen_manager = screen_manager
+        return screen_manager
+
+
 if __name__ == '__main__':
-    runTouchApp(MainScreen)
+    TestApp().run()
