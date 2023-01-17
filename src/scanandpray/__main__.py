@@ -2,6 +2,7 @@ from kivy.graphics import Rectangle
 from kivy.uix.button import Button
 from kivy.garden.xcamera import XCamera
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.image import Image
 from kivy.uix.label import Label
 from roboflow import Roboflow
 from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
@@ -38,25 +39,39 @@ def pray(predictions):
                        'הגפן': "בָּרוּךְ אַתָּה יהֵוָהֵ אֱלהֵינוּ מֶלֶךְ הָעולָם בּוֹרֵא פְּרִי הַגָּפֶן",
                        'העץ': "בָּרוּךְ אַתָּה יהֵוָהֵ אֱלהֵינוּ מֶלֶךְ הָעולָם בּוֹרֵא פְּרִי הָעֵץ",
                        'האדמה': "בָּרוּךְ אַתָּה יהֵוָהֵ אֱלהֵינוּ מֶלֶךְ הָעולָם בּוֹרֵא פְּרִי הָאֲדָמָה"}
-    create_souls_pray = "בָּרוּךְ אַתָּה יי אֱלהֵינוּ מֶלֶךְ הָעוֹלָם בּוֹרֵא נְפָשׁוֹת רַבּוֹת" \
-                        " וְחֶסְרוֹנָן עַל כָּל מַה שֶׁבָּרָאתָ לְהַחֲיוֹת בָּהֶם נֶפֶשׁ כָּל חָי. בָּרוּךְ חֵי הָעוֹלָמִים"
+
+    create_souls_pray = "עַל כָּל מַה שֶׁבָּרָאתָ לְהַחֲיוֹת בָּהֶם נֶפֶשׁ כָּל חָי. בָּרוּךְ חֵי הָעוֹלָמִים"
+    create_souls_pray += "\n"
+    create_souls_pray += "בָּרוּךְ אַתָּה יי אֱלהֵינוּ מֶלֶךְ הָעוֹלָם בּוֹרֵא נְפָשׁוֹת רַבּוֹת וְחֶסְרוֹנָן"
+
     last_pray_dict = {'המוציא': "ברכת המזון",
                       'שהכל': create_souls_pray,
                       'מזונות': "מעין שלוש",
                       'הגפן': "מעין שלוש",
                       'העץ': create_souls_pray,
                       'האדמה': create_souls_pray}
-    pray_text = "סדר הברכות: ברכת המוציא קודמת לברכת מזונות, שקודמת לברכת הגפן , " \
-                "שקודמת לברכת העץ, שקודמת (לחלק מהשיטות) לברכת האדמה, שקודמת לברכת שהכל\n\n " \
-                "ברכה ראשונה: "
 
-    for pray in predictions:
-        pray_text += first_pray_dict[pray] + "\n\n"
+    pray_text = ""
+
+    for l_pray in predictions:
+        pray_text += "\n" + last_pray_dict[l_pray]
+
+    pray_text += "\n"
 
     pray_text += "ברכה אחרונה: "
 
-    for pray in predictions:
-        pray_text += last_pray_dict[pray]
+    pray_text += "\n"
+
+    for f_pray in predictions:
+        pray_text += "\n" + first_pray_dict[f_pray]
+
+    pray_text += "\n"
+
+    pray_text += "ברכה ראשונה: "
+
+    pray_text += "\n\n"
+
+    pray_text += "סדר הברכות: המוציא, מזונות, הגפן, עץ, אדמה, שהכל "
 
     return pray_text
 
@@ -128,7 +143,9 @@ class MainScreen(Screen):
 
         # switch to the pray screen
         pray_screen = self.screen_manager.get_screen('pray_screen')
-        pray_screen.ids.pray_text.text = pray_text
+        pray_screen.pray.text = "[color=000000]" + pray_text[::-1] + "[/color]"
+        pray_screen.pray.markup = True
+        pray_screen.pray.base_direction = 'rtl'
         self.screen_manager.switch_to(pray_screen)
 
         # TODO
@@ -142,8 +159,8 @@ class MainScreen(Screen):
 class BackToCameraButton(Button):
     def __init__(self, **kwargs):
         super(BackToCameraButton, self).__init__(**kwargs)
-        self.size_hint = (0.2, 0.2)
-        self.pos_hint = {'center_x': 0.5, 'center_y': 0.9}
+        self.size_hint = (0.16, 0.16)
+        self.pos_hint = {'center_x': 0.5, 'center_y': 0.8}
         self.background_normal = 'return_icon.png'
 
 
@@ -152,18 +169,18 @@ class PrayScreen(Screen):
         super(PrayScreen, self).__init__(**kwargs)
         self.orientation = "vertical"
 
-        # add a label for the pray text
-        self.pray = Label(text="", pos_hint={'x': 0.5, 'y': 0.5}, size_hint=(0.8, 0.8), id='pray_text')
-        self.add_widget(self.pray)
-
         # add background image to the screen
-        self.rect = Rectangle(pos=self.pos, size=self.size, source='pray_background.png')
-        self.before.add_widget(self.rect)
+        self.background = Image(pos=self.pos, size=self.size, source='pray_background.jpeg')
+        self.add_widget(self.background)
 
         # add a return to camera button
         self.back_to_camera_button = BackToCameraButton()
         self.back_to_camera_button.bind(on_press=self.back_to_camera)
         self.add_widget(self.back_to_camera_button)
+
+        # add a label for the pray text
+        self.pray = Label(text="", pos_hint={'center_x': 0.5, 'center_y': 0.5}, font_size=20, font_name='arial')
+        self.add_widget(self.pray)
 
     def back_to_camera(self, instance):
         self.screen_manager.switch_to(self.screen_manager.get_screen('main_screen'))
