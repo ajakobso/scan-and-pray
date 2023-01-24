@@ -1,38 +1,52 @@
-from kivy.graphics import Rectangle
+from kivy.clock import Clock
 from kivy.uix.button import Button
 from kivy.garden.xcamera import XCamera
-from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.image import Image
 from kivy.uix.label import Label
+from kivy.uix.popup import Popup
 from roboflow import Roboflow
 from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 from kivy.app import App
-
+from split_image import split_image
 import os
 
-MIN_CONFIDENCE = 0.5
-API_KEY = "Oaqu2oIbVpT7bCyf1klh"
-MODEL_ENDPOINT = "food-hfbxu/scanpray"
-VERSION = 1
+__version__ = '1.0.0'
+
+# minimum confidence for a prediction to be shown
+MIN_CONFIDENCE = 0.8
+# api key of the roboflow model
+API_KEY = "0micJPzji8QmYEzKluri"  # "Oaqu2oIbVpT7bCyf1klh"
+# name of the roboflow model
+MODEL_ENDPOINT = "group-b-jct/scanpray2"  # "food-hfbxu/scanpray"
+# roboflow model version number
+VERSION = 2  # 3
+
+# number of rows the image will be split into in order to get more predictions
+ROW_NUM_OF_SPLIT = 4
+
+# number of columns the image will be split into in order to get more predictions
+COL_NUM_OF_SPLIT = 4
 
 
 class ChangeCameraButton(Button):
     def __init__(self, **kwargs):
         super(ChangeCameraButton, self).__init__(**kwargs)
-        self.size_hint = (0.17, 0.19)
-        self.pos_hint = {"x": 0.855, "center_y": 0.38}
-        self.background_normal = "change_camera.png"
+        self.size_hint = (0.15, 0.15)
+        self.pos_hint = {"x": 0.857, "center_y": 0.38}
+        self.background_normal = "switch_camera.png"
 
 
 class PredictPrayButton(Button):
     def __init__(self, **kwargs):
         super(PredictPrayButton, self).__init__(**kwargs)
-        self.size_hint = (0.2, 0.2)
-        self.pos_hint = {"x": 0.845, "center_y": 0.65}
-        self.background_normal = "pray_icon.png"
+        self.size_hint = (0.135, 0.11)
+        self.pos_hint = {"x": 0.87, "center_y": 0.65}
+        self.background_normal = "raising_hands.png"
 
 
 def pray(predictions):
+    if predictions is None:
+        return "לא נמצאו ברכות מתאימות, אנא נסו לצלם שנית"
     first_pray_dict = {'המוציא': "בָּרוּךְ אַתָּה יהֵוָהֵ אֱלהֵינוּ מֶלֶךְ הָעולָם הַמּוֹצִיא לֶחֶם מִן הָאָרֶץ",
                        'שהכל': "בָּרוּךְ אַתָּה יהֵוָהֵ אֱלהֵינוּ מֶלֶךְ הָעולָם שֶׁהַכֹּל ניהיה בִּדְבָרו",
                        'מזונות': "בָּרוּךְ אַתָּה יהֵוָהֵ אֱלהֵינוּ מֶלֶךְ הָעולָם בּוֹרֵא מִינֵי מְזוֹנוֹת",
@@ -54,7 +68,8 @@ def pray(predictions):
     pray_text = ""
 
     for l_pray in predictions:
-        pray_text += "\n" + last_pray_dict[l_pray]
+        if last_pray_dict[l_pray] not in pray_text:
+            pray_text += "\n" + last_pray_dict[l_pray]
 
     pray_text += "\n"
 
@@ -71,17 +86,39 @@ def pray(predictions):
 
     pray_text += "\n\n"
 
-    pray_text += "סדר הברכות: המוציא, מזונות, הגפן, עץ, אדמה, שהכל "
-
     return pray_text
+
+
+def filter_prays(predictions):
+    if "המוציא" in predictions:
+        return ["המוציא"]
+    pray_list = []
+    if "שהכל" in predictions:
+        pray_list.append("שהכל")
+    if "האדמה" in predictions:
+        pray_list.append("האדמה")
+    if "העץ" in predictions:
+        pray_list.append("העץ")
+    if "הגפן" in predictions:
+        pray_list.append("הגפן")
+    if "מזונות" in predictions:
+        pray_list.append("מזונות")
+    return pray_list
 
 
 class MainScreen(Screen):
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
         self.orientation = "vertical"
-        self.xcamera = XCamera(index=0, play=True)
-        self.add_widget(self.xcamera)
+        try:
+            self.xcamera = XCamera(index=0, play=True)
+            self.add_widget(self.xcamera)
+        except:
+            popup = Popup(title='Error',
+                          content=Label(text='The camera is unavailable', font_size=25, color=(1, 0, 0, 1)),
+                          pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                          size=(300, 300))
+            popup.open()
         self.change_camera_button = ChangeCameraButton()
         self.change_camera_button.bind(on_press=self.change_camera)
         self.add_widget(self.change_camera_button)
@@ -89,14 +126,32 @@ class MainScreen(Screen):
         self.predict_pray_button.bind(on_press=self.predict)
         self.add_widget(self.predict_pray_button)
 
-        # set the roboflow model values in the initial function in order to save time when predicting an image
-        self.rf = Roboflow(api_key=API_KEY)
-        self.project = self.rf.workspace().project(MODEL_ENDPOINT)
-        self.model = self.project.version(VERSION).model
+        try:
+            # set the roboflow model values in the initial function in order to save time when predicting an image
+            self.rf = Roboflow(api_key=API_KEY)
+            self.project = self.rf.workspace().project(MODEL_ENDPOINT)
+            self.model = self.project.version(VERSION).model
+        except:
+            popup = Popup(title='Error',
+                          content=Label(text='The model is unavailable, please try again later', font_size=25,
+                                        color=(1, 0, 0, 1)),
+                          pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                          size=(300, 300))
+            popup.open()
 
     def change_camera(self, instance):
-        xcamera = self.root.ids.xcamera
-        xcamera.index = (xcamera.index + 1) % 2  # toggle between 0 and 1
+        try:
+            xcamera = self.ids.xcamera
+            xcamera.index = (xcamera.index + 1) % 2  # toggle between 0 and 1
+            xcamera.play = True
+
+        except:
+            popup = Popup(title='Error',
+                          content=Label(text='No second camera found', font_size=20, color=(1, 1, 1, 1)),
+                          pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                          size_hint=(None, None),
+                          size=(300, 100))
+            popup.open()
 
     def predict(self, instance):
         # Get the current working directory
@@ -116,28 +171,77 @@ class MainScreen(Screen):
         # Sort the list of files by date
         sorted_date_files = sorted(date_files, key=lambda x: os.path.getmtime(x), reverse=True)
 
-        # print(sorted_date_files)
+        try:
+            # Get the latest image
+            first_image = sorted_date_files[0]
+        except:
+            popup = Popup(title='Error',
+                          content=Label(text='No images found', font_size=20, color=(1, 0, 0, 1)),
+                          pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                          size_hint=(None, None),
+                          size=(300, 100))
+            popup.open()
+            return
 
-        # TODO
-        # if there is no file available - print an error, and ask to take a picture first
-        first_image = sorted_date_files[0]
+        # e.g. split_image("bridge.jpg", 2, 2, True, False)
+        # split_image(image_path, rows, cols, should_square, should_cleanup, [output_dir])
 
-        # infer on a local image
-        output = self.model.predict(first_image).json()
+        try:
+            # infer on a local image
+            output = self.model.predict(first_image).json()
 
-        # create a dictionary from the json object
-        predictions_dict = dict(output['predictions'][0]['predictions'])
+            # create a dictionary from the json object
+            predictions_dict = dict(output['predictions'][0]['predictions'])
 
-        # create a dictionary with the pray as key, and prediction as the value o
-        new_dict = {key: value['confidence']
-                    for key, value in predictions_dict.items()
-                    if value['confidence'] >= MIN_CONFIDENCE}  # only if the prediction is above MIN_CONFIDENCE
+            # create a dictionary with the pray as key
+            pray_dict = {key: value['confidence']
+                         for key, value in predictions_dict.items()
+                         if value['confidence'] >= MIN_CONFIDENCE}  # only if the prediction is above MIN_CONFIDENCE
+        except Exception as e:
+            popup = Popup(title='Connection Error',
+                          content=Label(text="Please check your internet connection"
+                                             "and try again", font_size=25, color=(1, 0, 0, 1)),
+                          pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                          size_hint=(None, None),
+                          size=(200, 200))
+            popup.open()
+        # split the images into tiles in order to get more predictions
+        split_image(first_image, ROW_NUM_OF_SPLIT, COL_NUM_OF_SPLIT, False, False)
 
-        # print the values of the dictionary
-        for key, value in new_dict.items():
-            print(key, '    ', value)
+        # Iterate through all the split images created from the original image in order to receive more predictions
+        for num in range(0, (ROW_NUM_OF_SPLIT) * COL_NUM_OF_SPLIT):
 
-        pray_text = pray(new_dict.keys())
+            # get the path of the split image
+            image_path = f"{first_image[:-4]}_{num}.jpg"
+
+            try:
+                # infer on part of the image
+                output = self.model.predict(image_path).json()
+            except:
+                popup = Popup(title='Connection Error',
+                              content=Label(text="Please check your internet connection"
+                                                 "and try again", font_size=25, color=(1, 0, 0, 1)),
+                              pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                              size_hint=(None, None),
+                              size=(200, 200))
+                popup.open()
+
+            # create a dictionary from the json object
+            predictions_dict = dict(output['predictions'][0]['predictions'])
+
+            # add the additional prediction to the dictionary
+            pray_dict.update({key: value['confidence']
+                              for key, value in predictions_dict.items()
+                              if value['confidence'] >= MIN_CONFIDENCE})
+
+            print("sub image prediction: ", pray_dict.keys())
+            # remove the split image since we no longer need it
+            os.remove(image_path)
+
+        print(pray_dict.keys())
+        print("filter = ", filter_prays(pray_dict.keys()))
+        # filter the prays to get only the relevant ones and in order, and then create the text to be displayed
+        pray_text = pray(filter_prays(pray_dict.keys()))
 
         print(pray_text)
 
@@ -148,19 +252,24 @@ class MainScreen(Screen):
         pray_screen.pray.base_direction = 'rtl'
         self.screen_manager.switch_to(pray_screen)
 
-        # TODO
-        # 1. create a dictionary with the name of the pray as the key and the text as the value check
-        # for example 'שהכל' : 'ברוך את ... שהכל נהיה בדברו'
-        # 2. create the whole text to pray using the dictionary and the keys of new_dict check
-        # 3. create a GUI to display it (maybe use the background of the first presentation) and write above the text
-        # 4. create a button to go back to the camera screen
+        return_text = "יש ללחוץ על אייקון המצלמה " \
+                      "על מנת לחזור אחורה ולצלם תמונה נוספת"
+        reversed_return_text = return_text[::-1]
+        return_popup = Popup(title='ATTENTION',
+                             content=Label(text=reversed_return_text, font_name='arial', base_direction='rtl',
+                                           font_size=20,
+                                           color=(1, 1, 1, 1)),
+                             pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                             size_hint=(None, None),
+                             size=(600, 100))
+        return_popup.open()
 
 
 class BackToCameraButton(Button):
     def __init__(self, **kwargs):
         super(BackToCameraButton, self).__init__(**kwargs)
-        self.size_hint = (0.16, 0.16)
-        self.pos_hint = {'center_x': 0.5, 'center_y': 0.8}
+        self.size_hint = (0.12, 0.14)
+        self.pos_hint = {'center_x': 0.5, 'center_y': 0.75}
         self.background_normal = 'return_icon.png'
 
 
@@ -168,6 +277,7 @@ class PrayScreen(Screen):
     def __init__(self, **kwargs):
         super(PrayScreen, self).__init__(**kwargs)
         self.orientation = "vertical"
+        self.icon = "raising_hands.png"
 
         # add background image to the screen
         self.background = Image(pos=self.pos, size=self.size, source='pray_background.jpeg')
@@ -188,12 +298,34 @@ class PrayScreen(Screen):
 
 class TestApp(App):
     def build(self):
+        self.title = "Scan&Pray"
+        self.icon = "welcome.png"
         screen_manager = ScreenManager(transition=FadeTransition())
         screen_manager.add_widget(MainScreen(name='main_screen'))
         screen_manager.add_widget(PrayScreen(name='pray_screen'))
         MainScreen.screen_manager = screen_manager
         PrayScreen.screen_manager = screen_manager
+
+        welocme_text = """
+                בהצלחה, ושיהיה בתיאבון!
+לאחר צילום התמונה, לחצו על אייקון הידיים לקבלת הברכות המתאימות
+לשינוי המצלמה לחצו על האייקון התחתון בפינה הימנית של המסך    
+לצילום תמונה לחצו על אייקון המצלמה שבפינה הימנית של המסך
+ברוכים הבאים לאפליקציית סרוק וברך):
+        """
+        reversed_welcome_text = welocme_text[-1::-1]
+
+        self.popup = Popup(title='WELCOME!',
+                           content=Label(text=reversed_welcome_text, font_name='arial', base_direction='rtl',
+                                         font_size=20, color=(1, 1, 1, 1)),
+                           pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                           size_hint=(None, None),
+                           size=(600, 200))
+        Clock.schedule_once(self.show_popup, 5)
         return screen_manager
+
+    def show_popup(self, dt):
+        self.popup.open()
 
 
 if __name__ == '__main__':
