@@ -13,7 +13,7 @@ import os
 __version__ = '1.0.0'
 
 # minimum confidence for a prediction to be shown
-MIN_CONFIDENCE = 0.8
+MIN_CONFIDENCE = 0.7
 # api key of the roboflow model
 API_KEY = "0micJPzji8QmYEzKluri"  # "Oaqu2oIbVpT7bCyf1klh"
 # name of the roboflow model
@@ -22,10 +22,10 @@ MODEL_ENDPOINT = "group-b-jct/scanpray2"  # "food-hfbxu/scanpray"
 VERSION = 2  # 3
 
 # number of rows the image will be split into in order to get more predictions
-ROW_NUM_OF_SPLIT = 4
+ROW_NUM_OF_SPLIT = 3
 
 # number of columns the image will be split into in order to get more predictions
-COL_NUM_OF_SPLIT = 4
+COL_NUM_OF_SPLIT = 3
 
 
 class ChangeCameraButton(Button):
@@ -209,34 +209,36 @@ class MainScreen(Screen):
         split_image(first_image, ROW_NUM_OF_SPLIT, COL_NUM_OF_SPLIT, False, False)
 
         # Iterate through all the split images created from the original image in order to receive more predictions
-        for num in range(0, (ROW_NUM_OF_SPLIT) * COL_NUM_OF_SPLIT):
-
+        for num in range(0, ROW_NUM_OF_SPLIT * COL_NUM_OF_SPLIT):
             # get the path of the split image
             image_path = f"{first_image[:-4]}_{num}.jpg"
 
-            try:
-                # infer on part of the image
-                output = self.model.predict(image_path).json()
-            except:
-                popup = Popup(title='Connection Error',
-                              content=Label(text="Please check your internet connection"
-                                                 "and try again", font_size=25, color=(1, 0, 0, 1)),
-                              pos_hint={'center_x': 0.5, 'center_y': 0.5},
-                              size_hint=(None, None),
-                              size=(200, 200))
-                popup.open()
+            # infer only on images from the center of the image
+            if num % COL_NUM_OF_SPLIT != 0 and num % COL_NUM_OF_SPLIT != COL_NUM_OF_SPLIT - 1:
 
-            # create a dictionary from the json object
-            predictions_dict = dict(output['predictions'][0]['predictions'])
+                try:
+                    # infer on part of the image
+                    output = self.model.predict(image_path).json()
 
-            # add the additional prediction to the dictionary
-            pray_dict.update({key: value['confidence']
-                              for key, value in predictions_dict.items()
-                              if value['confidence'] >= MIN_CONFIDENCE})
+                    # create a dictionary from the json object
+                    predictions_dict = dict(output['predictions'][0]['predictions'])
 
-            print("sub image prediction: ", pray_dict.keys())
+                    # add the additional prediction to the dictionary
+                    pray_dict.update({key: value['confidence']
+                                      for key, value in predictions_dict.items()
+                                      if value['confidence'] >= MIN_CONFIDENCE})
+
+                    print("sub image prediction: ", pray_dict.keys())
+                except:
+                    popup = Popup(title='Connection Error',
+                                  content=Label(text="Please check your internet connection"
+                                                     "and try again", font_size=25, color=(1, 0, 0, 1)),
+                                  pos_hint={'center_x': 0.5, 'center_y': 0.5},
+                                  size_hint=(None, None),
+                                  size=(200, 200))
+                    popup.open()
             # remove the split image since we no longer need it
-            os.remove(image_path)
+            # os.remove(image_path)
 
         print(pray_dict.keys())
         print("filter = ", filter_prays(pray_dict.keys()))
